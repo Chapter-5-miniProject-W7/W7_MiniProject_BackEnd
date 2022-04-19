@@ -55,3 +55,13 @@ public class LikeService {
 
     }
 }
+
+like 테이블에는 user정보, post정보,
+post에는 like 갯수와, user에 따른 boolean값이 들어가야함
+        like갯수와 boolean값이 들어가야함
+        post
+그렇다면
+long likecnt = 포스트아이디로 찾은 countby결과값
+boolean은 유저와 포스트아이디를 찾아서 있으면 1 없으면 0
+
+

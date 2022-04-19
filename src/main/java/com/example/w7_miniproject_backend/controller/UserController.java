@@ -18,4 +18,20 @@ public class UserController {
         return userService.registerUser(signupRequestDto);
     }
 
+<<<<<<< Updated upstream
+=======
+    // 닉네임 중복 확인
+    @PostMapping("/user/idCheck")
+    public boolean nicknameCheck(@RequestBody SignupRequestDto signupRequestDto) {
+        return userService.nicknameCheck(signupRequestDto.getNickname());
+    }
+
+    // 카카오 소셜 로그인
+    @GetMapping("/user/kakao/callback")
+    public ResponseEntity<KakaoUserResponseDto> kakaoLogin(@RequestParam String code, HttpServletResponse response) throws JsonProcessingException {
+        KakaoUserResponseDto kakaoUserResponseDto = kakaoUserService.kakaoLogin(code, response);
+        return ResponseEntity.ok().body(kakaoUserResponseDto);
+    }
+    @GetMapping("/post/residence={residence}/")
+>>>>>>> Stashed changes
 }
