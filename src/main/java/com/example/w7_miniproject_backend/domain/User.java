@@ -1,5 +1,6 @@
 package com.example.w7_miniproject_backend.domain;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -10,11 +11,11 @@ import javax.persistence.*;
 @Getter
 @Entity
 @NoArgsConstructor
-public class User extends Timestamped {
+public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long userId;
+    private Long Id;
 
     @Column(nullable = false, unique = true)
     private String username;
@@ -24,7 +25,6 @@ public class User extends Timestamped {
 
     @Column(nullable = false)
     private String password;
-
 
     public User(String username, String encodedPassword, String nickname) {
         this.username = username;

@@ -1,30 +1,30 @@
 package com.example.w7_miniproject_backend.domain;
 
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import lombok.*;
 
 import javax.persistence.*;
 
 @Entity
 @Getter
+@Builder
+@AllArgsConstructor
 @NoArgsConstructor
-//@RequiredArgsConstructor
-public class Like {
+public class Liken {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column
     private Long id;
 
     @ManyToOne
-    @JoinColumn(name= "post_id")
     private Post post;
 
     @ManyToOne
     @JoinColumn(name= "user_id")
     private User user;
 
-    //repostitory countbypostid
+
+    //repostitory countby postid
 }
 // 1번라이크는 누가 좋아요 2번에는 또 다른 누군가
 // 좋아요를 나중에

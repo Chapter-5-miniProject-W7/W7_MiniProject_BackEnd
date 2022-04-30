@@ -1,19 +1,19 @@
 package com.example.w7_miniproject_backend.service;
 
+import com.example.w7_miniproject_backend.domain.Category;
+import com.example.w7_miniproject_backend.domain.Comment;
 import com.example.w7_miniproject_backend.domain.Post;
 import com.example.w7_miniproject_backend.domain.User;
-import com.example.w7_miniproject_backend.dto.userDto.PostRequestDto;
-import com.example.w7_miniproject_backend.dto.userDto.PostResponseDto;
-import com.example.w7_miniproject_backend.repository.LikeRepository;
-import com.example.w7_miniproject_backend.repository.PostRepository;
-import com.example.w7_miniproject_backend.repository.UserRepository;
+import com.example.w7_miniproject_backend.dto.commentDto.CommentDto;
+import com.example.w7_miniproject_backend.dto.postDto.PostRequestDto;
+import com.example.w7_miniproject_backend.dto.postDto.PostResponseDto;
+import com.example.w7_miniproject_backend.repository.*;
 import com.example.w7_miniproject_backend.security.jwt.JwtDecoder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
-
 import javax.transaction.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -21,13 +21,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@RequiredArgsConstructor
 @Service
+@RequiredArgsConstructor
 public class PostService {
     private final AwsS3Service awsS3Service;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final LikeRepository likeRepository;
+    private final CommentRepository commentRepository;
+    private final CategoryRepository categoryRepository;
+    private final ScrapRepository scrapRepository;
     private final JwtDecoder jwtDecoder;
 
     @Transactional
@@ -37,67 +40,79 @@ public class PostService {
         Map<String, String> map = awsS3Service.uploadFile(multipartFile);
         User joinUser = userRepository.findByUsername(username).orElseThrow(
                 () -> new IllegalArgumentException("유효한 회원을 찾을 수 없습니다."));
+//        Category category = postDto.getCategory();
         Post post = Post.builder()
                 .roomimg(map.get("fileName"))
-                .roomUrl(map.get("url"))
+                .roomurl(map.get("url"))
                 .des(postDto.getDes())
                 .user(joinUser)
+//                .category(category)
                 .build();
         postRepository.save(post);
         // 추가로 카테고리 저장.
         return ResponseEntity.ok().body("등록 완료");
     }
 
-/*
-    //// 흐름을 프론트가 누르면 서비스로 가서 딱딱딱 한다.
-    @Transactional
-    public Post createPost(@RequestPart PostRequestDto postRequestDto,
-                           @AuthenticationPrincipal UserDetailsImpl userDetails
-                          ) {
-//파트랑 바디랑 둘다 못불러온다.
-        String username = userDetails.getUsername();
-        String roomimg = postRequestDto.getRoomimg();
-        String des = postRequestDto.getDes();
-        // 이걸 리스트로 저장하면 안되나?. 자동으로 저장이 되나? 질러줘야 하는부분인데
-        String roomsize = postRequestDto.getRoomsize();
-        String roomstyle = postRequestDto.getRoomstyle();
-        String space = postRequestDto.getSpace();
-        Category category  = new Category(roomsize, roomstyle, space);
-        Post createPost = new Post(username, roomimg, des, category);
+    public ResponseEntity<PostResponseDto.DetailResponse> getPostDeatils(Long postId, String user) {
+        Post post = postRepository.findById(postId).orElseThrow(
+                () -> new IllegalArgumentException("찾으시는 게시물이 존재하지 않습니다.")
+        );
+        String username = jwtDecoder.decodeUsername(user);
+        User joinUser = userRepository.findByUsername(username).orElseThrow(
+                () -> new IllegalArgumentException("유효한 회원을 찾을 수 없습니다."));
+        List<Comment> commentList = commentRepository.findByPostId(postId);
+        List<CommentDto.listDto> commentlistDto = new ArrayList<>();
+        for(Comment comment : commentList) {
+            CommentDto.listDto listDto = CommentDto.listDto.builder()
+                    .postid(comment.getPost().getId())
+                    .comments(comment.getComments())
+                    .nickname(comment.getUser().getNickname())
+                    .build();
+            commentlistDto.add(listDto);
+        }
+//        Category category =
+        Long Likes = 0L;
+        Long Scraps = 0L;
+        if (likeRepository.findByUserAndPost(joinUser, post).orElse(null) == null){
+            Likes = likeRepository.countAllByPostId(postId);
+        }
 
-        categoryRepository.save(category);
-        postRepository.save(createPost);
+        if (scrapRepository.findByPostAndUser(post, joinUser).orElse(null) == null){
+            Scraps = scrapRepository.countAllByPostId(postId);
+        }
 
-        return createPost;
-    }*/
-
-    public List<Post> getPosts(Long postId){
-        return postRepository.findAllById(postId);
+        PostResponseDto.DetailResponse detailDto = PostResponseDto.DetailResponse
+                .builder()
+                .nickname(post.getUser().getNickname())
+                .des(post.getDes())
+                .modifiedAt(formmater(post.getModifiedAt()))
+                .roomurl(post.getRoomurl())
+                .roomimg(post.getRoomimg())
+                .liketotal(Likes)
+                .scraptotal(Scraps)
+//                .category()
+                .commentDtoList(commentlistDto)
+                .build();
+        return new ResponseEntity(detailDto, HttpStatus.OK);
     }
 
-//    public Post updatePost(Long postId, PostRequestDto postRequestDto,
-//                           UserDetailsImpl userDetails){
-//
-//        Post post = postRepository.findById(postId).orElseThrow(
-//                () -> new NullPointerException("그런 포스트는 없어요")
-//        );
-//
-//        post.update(postRequestDto, userDetails);
-////        postRepository.save(post); // 생략이 가능 쓸필요 X 53번줄이 들어갈거면 굳이 save가 들어갈 필요가 없음.
-//        return post;
-//    }
-    public ResponseEntity<PostResponseDto> getAllPost() {
+    public ResponseEntity<PostResponseDto.MainResponse> getAllPost() {
         List<Post> posts = postRepository.findAllByOrderByCreatedAtDesc();
-        List<PostResponseDto> postReponse = new ArrayList<>();
+        List<PostResponseDto.MainResponse> postReponse = new ArrayList<>();
         for (Post post : posts) {
             Long LikeTotal = likeRepository.countAllByPostId(post.getId());
-            PostResponseDto postDto = PostResponseDto
+            Long ScrapTotal = scrapRepository.countAllByPostId(post.getId());
+            PostResponseDto.MainResponse postDto = PostResponseDto.MainResponse
                     .builder()
-                    .userName(post.getUser().getUsername())
+                    .id(post.getId())
+                    .nickname(post.getUser().getNickname())
                     .des(post.getDes())
                     .modifiedAt(formmater(post.getModifiedAt()))
-                    .roomUrl(post.getRoomUrl())
-                    .likeTotal(LikeTotal)
+                    .roomurl(post.getRoomurl())
+                    .roomimg(post.getRoomimg())
+                    .liketotal(LikeTotal)
+                    .scraptotal(ScrapTotal)
+//                    .category()
                     .build();
             postReponse.add(postDto);
         }
@@ -108,42 +123,33 @@ public class PostService {
         return DateTimeFormatter.ofPattern("yyyy-MM-dd").format(localDateTime);
     }
 
+    public ResponseEntity<HttpStatus> update(Long postId, MultipartFile multipartFile, PostRequestDto.PutRequest postDto, String user) {
+        String username = jwtDecoder.decodeUsername(user);
+        Post post = postRepository.findById(postId).orElseThrow(
+                () -> new NullPointerException("찾으시는 게시글이 존재하지 않습니다."));
+        awsS3Service.deleteFile(post.getRoomimg());
+        validateCheckUser(username, post);
+//        PostValidator.validatePostPutRegister(multipartFile, postDto);
+        Map<String, String> map = awsS3Service.uploadFile(multipartFile);
 
+        post.update(postDto , map.get("url") , map.get("fileName"));
+        postRepository.save(post);
+        return new ResponseEntity(HttpStatus.OK);
+    }
+
+    private void validateCheckUser(String user, Post post) {
+        if (!user.equals(post.getUser().getUsername())) {
+            throw new IllegalArgumentException("삭제 권한이 없는 유저 입니다.");
+        }
+    }
+
+    public ResponseEntity<HttpStatus> delete(Long postId, String user) {
+        Post post = postRepository.findById(postId).orElseThrow(() -> new NullPointerException("찾는 게시물이 없습니다."));
+        String username = jwtDecoder.decodeUsername(user);
+        validateCheckUser(username, post);
+        postRepository.delete(post);
+        awsS3Service.deleteFile(post.getRoomimg());
+        return new ResponseEntity(HttpStatus.OK);
+    }
 }
-
-
-
-
-
-
-//        Long storeId = commentDto.getStoreId();
-//        String userName = commentDto.getUserName();
-//        String comment = commentDto.getComment();
-//
-//        Comment createComment = new Comment(storeId, userName, comment);
-//
-//        commentRepository.save(createComment);
-//        return createComment;
-
-//    public Post createPost(PostRequestDto postRequestDto, String username, CategoryRequestDto categoryRequestDto){
-//        User user = userRepository.findByUsername(username).orElseThrow(()
-//                -> new IllegalArgumentException("이게 뜰일이 있나?.")); //토큰이 만료되었을때를 대비하여 있어야한다.
-//
-//        Post post = new Post(postRequestDto, user, categoryRequestDto);
-//        return postRepository.save(post);
-//
-//    }
-//        String username = userDetails.getUsername();
-//        String roomimg = postRequestDto.getRoomimg(); // 룸이미지와 룸 url로 나눠서 받아야한다. 나누는게 더 손이 많이감 파일명 유알엘을 따로 가져가서 사용?
-////        Category category = categoryRequestDto.getRoomsize();
-//// 이걸 리스트로 저장하면 안되나?. 자동으로 저장이 되나? 질러줘야 하는부분인데
-//
-//
-//        String roomsize = categoryRequestDto.getRoomsize();
-//        String roomstyle = categoryRequestDto.getRoomstyle();
-//        String space = categoryRequestDto.getSpace();
-//
-//        return postService.createPost(postRequestDto, username, categoryRequestDto);
-
-
 

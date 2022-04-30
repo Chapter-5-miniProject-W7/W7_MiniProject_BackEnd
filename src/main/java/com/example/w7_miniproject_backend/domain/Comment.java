@@ -1,22 +1,21 @@
 package com.example.w7_miniproject_backend.domain;
 
-import com.example.w7_miniproject_backend.dto.userDto.CommentDto;
+import com.example.w7_miniproject_backend.dto.commentDto.CommentDto;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import lombok.*;
 
 import javax.persistence.*;
 
-@Entity
-@Getter
 @NoArgsConstructor
-//@RequiredArgsConstructor
-@Setter
-@Builder
 @AllArgsConstructor
+@Builder
+@Getter
+@Setter
+@Entity
 public class Comment extends Timestamped{
 
     @Id
-    //user와 comment generationtype설정 확인!
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne
@@ -24,6 +23,7 @@ public class Comment extends Timestamped{
     private User user;
 
     @ManyToOne
+    @JoinColumn(name="post_id", nullable = false)
     private Post post;
 
     private String comments;
